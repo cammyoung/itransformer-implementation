@@ -8,6 +8,7 @@ from layers.utils import EmbeddingLayer, FeedForwardLayer
 class EncoderOnly(keras.layers.Layer):
     def __init__(
         self,
+        output_len: int,
         output_dim: int,
         num_layers: int = 6,
         num_heads: int = 8,
@@ -16,6 +17,7 @@ class EncoderOnly(keras.layers.Layer):
         invert_data: bool = False,
     ):
         super().__init__()
+        self.output_len = output_len
         self.output_dim = output_dim
         self.num_layers = num_layers
         self.num_heads = num_heads
@@ -38,7 +40,9 @@ class EncoderOnly(keras.layers.Layer):
             dropout=self.dropout,
         )
         self.revert_layer = keras.layers.Permute((2, 1))
-        self.projector_layer = keras.layers.Dense(self.output_dim)
+        self.projector_layer = keras.layers.Dense(
+            self.output_len if self.invert_data else self.output_dim
+        )
 
     def call(self, inputs, training):
         if self.invert_data:
@@ -47,11 +51,10 @@ class EncoderOnly(keras.layers.Layer):
         outputs = self.embedding_layer(inputs, training=training)
         outputs = self.encoder_stack([outputs, outputs, outputs],
                                      training=training)
+        outputs = self.projector_layer(outputs)
 
         if self.invert_data:
-            outputs = self.revert_layer(outputs)
-
-        outputs = self.projector_layer(outputs)
+            outputs = self.revert_layer(outputs)[:, :, :self.output_dim]
 
         return outputs
 
