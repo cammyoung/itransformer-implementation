@@ -8,6 +8,7 @@ from layers.utils import EmbeddingLayer, FeedForwardLayer
 class EncoderOnly(keras.layers.Layer):
     def __init__(
         self,
+        output_dim: int,
         num_layers: int = 6,
         num_heads: int = 8,
         d_model: int = 512,
@@ -15,6 +16,7 @@ class EncoderOnly(keras.layers.Layer):
         invert_data: bool = False,
     ):
         super().__init__()
+        self.output_dim = output_dim
         self.num_layers = num_layers
         self.num_heads = num_heads
         self.d_model = d_model
@@ -28,7 +30,7 @@ class EncoderOnly(keras.layers.Layer):
 
     def build(self, input_shape):
         self.invert_layer = keras.layers.Permute((2, 1))
-        self.embedding_layer = EmbeddingLayer(d_model=self.d_model)
+        self.embedding_layer = EmbeddingLayer(embedding_dim=self.d_model)
         self.encoder_stack = EncoderStack(
             num_layers=self.num_layers,
             num_heads=self.num_heads,
@@ -36,16 +38,20 @@ class EncoderOnly(keras.layers.Layer):
             dropout=self.dropout,
         )
         self.revert_layer = keras.layers.Permute((2, 1))
+        self.projector_layer = keras.layers.Dense(self.output_dim)
 
     def call(self, inputs, training):
         if self.invert_data:
             inputs = self.invert_layer(inputs)
 
         outputs = self.embedding_layer(inputs, training=training)
-        outputs = self.encoder_stack(inputs, training=training)
+        outputs = self.encoder_stack([outputs, outputs, outputs],
+                                     training=training)
 
         if self.invert_data:
             outputs = self.revert_layer(outputs)
+
+        outputs = self.projector_layer(outputs)
 
         return outputs
 
@@ -83,7 +89,7 @@ class DualEncoder(keras.layers.Layer):
         self.input_len = input_shape[1]
         self.n_features = input_shape[-1]
 
-        self.embedding_layer = EmbeddingLayer(d_model=self.d_model)
+        self.embedding_layer = EmbeddingLayer(embedding_dim=self.d_model)
         self.encoder = EncoderStack(
             num_layers=self.num_layers,
             num_heads=self.num_heads,
@@ -92,7 +98,9 @@ class DualEncoder(keras.layers.Layer):
         )
 
         self.invert_layer = keras.layers.Permute((2, 1))
-        self.inverted_embedding_layer = EmbeddingLayer(d_model=self.d_model)
+        self.inverted_embedding_layer = EmbeddingLayer(
+            embedding_dim=self.d_model
+        )
         self.inverted_encoder = EncoderStack(
             num_layers=self.num_layers,
             num_heads=self.num_heads,
@@ -109,19 +117,23 @@ class DualEncoder(keras.layers.Layer):
         self.output_layer = keras.layers.Dense(self.output_dim)
 
     def call(self, inputs, training):
-        # Encoding all features for each time step of the inputs
+        # Encoding all features at each time step of the inputs independently
         embedding = self.embedding_layer(
             inputs, training=training
         )
-        outputs = self.encoder(embedding, training=training)  # (B, S, E)
+        outputs = self.encoder(
+            [embedding, embedding, embedding],
+            training=training
+        )  # (B, S, E)
 
-        # Encoding whole sequences for each feature of the inputs
-        inverted_inputs = self.invert_layer(inputs)  # (B, N, S)
+        # Encoding whole sequences of each feature of the inputs independently
+        inverted_inputs = self.invert_layer(outputs)  # (B, N, S)
         inverted_embedding = self.inverted_embedding_layer(
             inverted_inputs, training=training
         )  # (B, N, E)
         inverted_outputs = self.inverted_encoder(
-            inverted_embedding, training=training
+            [inverted_embedding, inverted_embedding, inverted_embedding],
+            training=training
         )  # (B, N, E)
         inverted_outputs = self.inverted_projector_layer(
             inverted_outputs

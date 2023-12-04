@@ -1,6 +1,6 @@
 import keras
 
-from utils import FeedForwardLayer
+from .utils import FeedForwardLayer
 
 
 class EncoderLayer(keras.layers.Layer):
@@ -30,7 +30,7 @@ class EncoderLayer(keras.layers.Layer):
 
         query_shape, value_shape, key_shape = input_shape
 
-        self.attention = keras(
+        self.attention = keras.layers.MultiHeadAttention(
             num_heads=self.num_heads,
             key_dim=self.d_model // self.num_heads,
             value_dim=self.d_model // self.num_heads,

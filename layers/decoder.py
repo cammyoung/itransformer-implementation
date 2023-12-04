@@ -1,6 +1,6 @@
 import keras
 
-from utils import FeedForwardLayer
+from .utils import FeedForwardLayer
 
 
 class DecoderLayer(keras.layers.Layer):
