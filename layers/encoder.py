@@ -26,6 +26,7 @@ class EncoderLayer(keras.layers.Layer):
         if len(input_shape) != 3:
             raise ValueError(
                 "EncoderLayer expects a tuple of 3 inputs (query, value, key)"
+                f" but got {input_shape}"
             )
 
         query_shape, value_shape, key_shape = input_shape
@@ -50,7 +51,7 @@ class EncoderLayer(keras.layers.Layer):
     def call(self, inputs, training):
         if len(inputs) != 3:
             raise ValueError("EncoderLayer expects a tuple of 3 inputs "
-                             "(query, value, key)")
+                             "(query, value, key) but got {inputs}")
 
         query, value, key = inputs
         attention_outputs = self.attention(
@@ -88,6 +89,12 @@ class EncoderStack(keras.layers.Layer):
         self.encoder_layers = None
 
     def build(self, input_shape):
+        if len(input_shape) != 3:
+            raise ValueError(
+                "EncoderStack expects a tuple of 3 inputs (query, value, key)"
+                f" but got {input_shape}"
+            )
+
         self.encoder_layers = [
             EncoderLayer(num_heads=self.num_heads,
                          d_model=self.d_model,
@@ -96,6 +103,12 @@ class EncoderStack(keras.layers.Layer):
         ]
 
     def call(self, inputs, training):
+        if len(inputs) != 3:
+            raise ValueError(
+                "EncoderStack expects a tuple of 3 inputs (query, value, key)"
+                f" but got {inputs}"
+            )
+
         for encoder_layer in self.encoder_layers:
             inputs = encoder_layer(inputs, training=training)
         return inputs
