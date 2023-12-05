@@ -49,8 +49,7 @@ class EncoderOnly(keras.layers.Layer):
             inputs = self.invert_layer(inputs)
 
         outputs = self.embedding_layer(inputs, training=training)
-        outputs = self.encoder_stack([outputs, outputs, outputs],
-                                     training=training)
+        outputs = self.encoder_stack(outputs, training=training)
         outputs = self.projector_layer(outputs)
 
         if self.invert_data:

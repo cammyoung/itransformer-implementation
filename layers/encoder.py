@@ -23,14 +23,6 @@ class EncoderLayer(keras.layers.Layer):
         self.layer_norm_2 = None
 
     def build(self, input_shape):
-        if len(input_shape) != 3:
-            raise ValueError(
-                "EncoderLayer expects a tuple of 3 inputs (query, value, key)"
-                f" but got {input_shape}"
-            )
-
-        query_shape, value_shape, key_shape = input_shape
-
         self.attention = keras.layers.MultiHeadAttention(
             num_heads=self.num_heads,
             key_dim=self.d_model // self.num_heads,
@@ -40,7 +32,7 @@ class EncoderLayer(keras.layers.Layer):
         # _build_from_signature call required as per
         # https://www.tensorflow.org/api_docs/python/tf/keras/layers/MultiHeadAttention
         self.attention._build_from_signature(
-            query_shape, value_shape, key_shape
+            input_shape, input_shape, input_shape
         )
         self.attention_dropout = keras.layers.Dropout(self.dropout)
         self.layer_norm_1 = keras.layers.LayerNormalization()
@@ -49,20 +41,15 @@ class EncoderLayer(keras.layers.Layer):
         self.layer_norm_2 = keras.layers.LayerNormalization()
 
     def call(self, inputs, training):
-        if len(inputs) != 3:
-            raise ValueError("EncoderLayer expects a tuple of 3 inputs "
-                             "(query, value, key) but got {inputs}")
-
-        query, value, key = inputs
         attention_outputs = self.attention(
-            query=query,
-            value=value,
-            key=key,
+            query=inputs,
+            value=inputs,
+            key=inputs,
             attention_mask=None,
             training=training,
         )
         attention_outputs = self.layer_norm_1(
-            self.attention_dropout(attention_outputs) + query
+            self.attention_dropout(attention_outputs) + inputs
         )
 
         dense_outputs = self.feed_forward(attention_outputs)
@@ -89,12 +76,6 @@ class EncoderStack(keras.layers.Layer):
         self.encoder_layers = None
 
     def build(self, input_shape):
-        if len(input_shape) != 3:
-            raise ValueError(
-                "EncoderStack expects a tuple of 3 inputs (query, value, key)"
-                f" but got {input_shape}"
-            )
-
         self.encoder_layers = [
             EncoderLayer(num_heads=self.num_heads,
                          d_model=self.d_model,
@@ -103,12 +84,7 @@ class EncoderStack(keras.layers.Layer):
         ]
 
     def call(self, inputs, training):
-        if len(inputs) != 3:
-            raise ValueError(
-                "EncoderStack expects a tuple of 3 inputs (query, value, key)"
-                f" but got {inputs}"
-            )
-
+        outputs = inputs
         for encoder_layer in self.encoder_layers:
-            inputs = encoder_layer(inputs, training=training)
-        return inputs
+            outputs = encoder_layer(outputs, training=training)
+        return outputs
