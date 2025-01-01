@@ -39,7 +39,6 @@ class EncoderOnly(keras.layers.Layer):
             d_model=self.d_model,
             dropout=self.dropout,
         )
-        self.revert_layer = keras.layers.Permute((2, 1))
         self.projector_layer = keras.layers.Dense(
             self.output_len if self.invert_data else self.output_dim
         )
@@ -53,7 +52,9 @@ class EncoderOnly(keras.layers.Layer):
         outputs = self.projector_layer(outputs)
 
         if self.invert_data:
-            outputs = self.revert_layer(outputs)[:, :, :self.output_dim]
+            outputs = self.invert_layer(
+                outputs
+            )[:, :self.output_len, :self.output_dim]
 
         return outputs
 
